@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/bencsikg/DEV/handmarker/handmarker.cpp
+opencv/cv.h
+-
+opencv/cxcore.h
+-
+opencv/highgui.h
+-
+iostream
+-
+

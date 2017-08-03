@@ -1,0 +1,3 @@
+/home/bencsikg/DEV/handmarker/CMakeFiles/rebuild_cache.dir
+/home/bencsikg/DEV/handmarker/CMakeFiles/edit_cache.dir
+/home/bencsikg/DEV/handmarker/CMakeFiles/handmarker.dir
