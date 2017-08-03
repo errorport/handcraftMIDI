@@ -1,4 +1,4 @@
-##TODO LIST
+## TODO LIST
 
 1. check the center of the hand
 2. check the direction of the hand

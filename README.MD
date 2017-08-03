@@ -1,4 +1,4 @@
-#handcraftMIDI
+# handcraftMIDI
 
 _created by Gergely Bencsik_
 
@@ -6,7 +6,7 @@ _project inherited from [https://github.com/udit043/Hand-Recognition-using-OpenC
 
 ___
 
-##Compiling
+## Compiling
 
 The project uses CMake and it is still configured.
 
