@@ -4,6 +4,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include <iostream>
+#include <cmath>
 
 #define SUBFRAME_BIT_DEPTH   8      //bit depth of the subframe source
 #define SUBFRAME_CHANNELS    1      //channels of the subframe source (original:3)
@@ -25,7 +26,7 @@
 #define BLUR_APERATURE_SIZE   20    //
 #define BIN_THRESH            0
 
-#define INVBIN                false // for rebinarizing the binarized image
+#define INVBIN                true // for rebinarizing the binarized image
 
 #define SHOWSRCFIRST          false
 #define SHOWMAIN              true
@@ -35,6 +36,12 @@
 #define SHOWPOS               false //  write to >>1 the position of fingers
 #define SHOWROI               true // to show the ROI on the sourceFrame
 #define SHOW_CENTER           true
+#define SHOW_THETA            true
+
+#define REINIT_DIRECTION      false
+
+#define DEFULT_DIRECTION      0
+#define PI                    3.14159265
 
 using namespace     std;
 using namespace     cv;
@@ -77,6 +84,7 @@ vector<Point> points;
 
 int meanX, meanY;
 int nomdef; // number of defections
+int delta_x, delta_y, theta;
 
 //initializing, running
 void run()
@@ -141,6 +149,10 @@ void run()
     ptr           = 0;
     meanX = meanY = 0;
     nomdef        = 0;
+    #if REINIT_DIRECTION == true
+    delta_x = delta_y = 0;
+    theta   = DEFULT_DIRECTION;
+    #endif
     //eof reinit
 
 
@@ -221,6 +233,7 @@ void run()
 					pt0.y = p->y;
 					cvSeqPush( ptseq, &pt0 );
 				}
+
 				hull = cvConvexHull2( ptseq, 0, CV_CLOCKWISE, 0 );
 				int hullcount = hull->total;
 				defects= cvConvexityDefects(ptseq,hull,storage2  );
@@ -234,6 +247,7 @@ void run()
           meanY+=pt0.y;
 					pt0 = pt;
 				}
+
 				for( ; defects; defects = defects->h_next)
 				{
 					nomdef = defects->total; // defect amount
@@ -262,6 +276,13 @@ void run()
 							       cout << i << ": y: "<<defectArray[i].depth_point->y << "\n";
               #endif
 
+              //calculating the direction
+              delta_x = defectArray[i].depth_point->x - defectArray[i].start->x;
+              delta_y = defectArray[i].depth_point->x - defectArray[i].start->x;
+              //cout << delta_x << endl;
+              theta   += (int)(atan2(delta_x, delta_y) * 180 / PI);
+
+
 							cvCircle( sourceFrame, *(defectArray[i].start), 5, CV_RGB(255,255,0), 2, 8,0); // inbetween finger points
 							cvLine( sourceFrame, *(defectArray[i].depth_point), *(defectArray[i].end),CV_RGB(0,255,255),1, CV_AA, 0 );
 							//cvDrawContours( sourceFrame ,defects,CV_RGB(0,0,0),CV_RGB(255,0,255),-1,CV_FILLED,8);
@@ -269,7 +290,22 @@ void run()
 						}
 					}
 
+            //got the center
+            //not strict enough
+            //moving avg needed for smooth movement of this point
+            meanX/=nomdef; meanX+=ROI_COORDINATE_X;
+            meanY/=nomdef;
 
+            #if SHOW_CENTER == true
+            cout << "Center: x==" << meanX << " y==" << meanY << endl;
+            #endif
+
+            //calculating the direction
+            theta = theta/nomdef;
+
+            #if SHOW_THETA == true
+            cout << "Direction angle: " << theta << "°" << endl;
+            #endif
 
 					// cout<<con<<"\n";
 					char txt[40]="";
@@ -310,8 +346,7 @@ void run()
 					//drop event here! ---------------------------------------
 
           //Free memory
-          meanX/=nomdef; meanX+=ROI_COORDINATE_X;
-          meanY/=nomdef;
+
 					free(defectArray);
 				}
 				cvReleaseMemStorage( &storage1 );
