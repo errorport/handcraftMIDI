@@ -37,11 +37,14 @@
 #define SHOWROI               true // to show the ROI on the sourceFrame
 #define SHOW_CENTER           true
 #define SHOW_THETA            true
+#define SHOW_PROXIMITY        true
 
 #define REINIT_DIRECTION      false
 
 #define DEFULT_DIRECTION      0
 #define PI                    3.14159265
+
+#define PROXIMITY_SCALE       42000.0 // for normalize the proximity control value - it have to be the maximum
 
 using namespace     std;
 using namespace     cv;
@@ -70,6 +73,7 @@ int                 contourNumber;
 //area of the hand
 double              area;
 double              max_area;
+int                 proximity_control;
 
 //
 CvSeq* ptr;
@@ -202,6 +206,7 @@ void run()
                                            cvPoint(0,0)
                                           );
 
+
     //if any contours has been found
     area = max_area = 0.0;
 
@@ -224,7 +229,7 @@ void run()
         storage2 = cvCreateMemStorage(0);
 
 				CvSeq* ptseq = cvCreateSeq( CV_SEQ_KIND_GENERIC|CV_32SC2, sizeof(CvContour),sizeof(CvPoint), storage1 );
-				CvSeq* hull;
+				CvSeq* hull = NULL;
 				CvSeq* defects;
 				for(int i = 0; i < maxitem->total; i++ )
 				{
@@ -235,6 +240,17 @@ void run()
 				}
 
 				hull = cvConvexHull2( ptseq, 0, CV_CLOCKWISE, 0 );
+
+        //get the proximity of the hand
+        //not strict enough
+        //need moving avg too
+        proximity_control = (int)(max_area/PROXIMITY_SCALE*100);
+        if(proximity_control > 100){proximity_control=100;}
+        #if SHOW_PROXIMITY == true
+          cout << "rel_maxarea: " << max_area << endl;
+          cout << "perc_maxarea: " << proximity_control << endl;
+        #endif
+
 				int hullcount = hull->total;
 				defects= cvConvexityDefects(ptseq,hull,storage2  );
 				CvConvexityDefect* defectArray;
