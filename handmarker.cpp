@@ -44,7 +44,22 @@
 #define DEFULT_DIRECTION      0
 #define PI                    3.14159265
 
-#define PROXIMITY_SCALE       42000.0 // for normalize the proximity control value - it have to be the maximum
+
+#define PROXIMITY_CONTROL_SCALE       42000.0 // for normalize the proximity control value - it have to be the maximum
+#define PROXIMITY_CONTROL_RANGE       127 // for normalize the proximity control value - it have to be the maximum
+#define INVERT_PROXIMITY_CONTROL      false
+
+#define X_CONTROL_OFFSET      0       // have to be finalized
+#define X_CONTROL_RANGE       127
+#define INVERT_X_CONTROL      false
+
+#define Y_CONTROL_OFFSET      0       // have to be finalized
+#define Y_CONTROL_RANGE       127
+#define INVERT_Y_CONTROL      false
+
+#define THETA_CONTROL_OFFSET  0       // have to be finalized
+#define THETA_CONTROL_RANGE   127
+#define INVERT_THETA CONTROL  false
 
 using namespace     std;
 using namespace     cv;
@@ -73,7 +88,7 @@ int                 contourNumber;
 //area of the hand
 double              area;
 double              max_area;
-int                 proximity_control;
+
 
 //
 CvSeq* ptr;
@@ -89,6 +104,8 @@ vector<Point> points;
 int meanX, meanY;
 int nomdef; // number of defections
 int delta_x, delta_y, theta;
+
+int proximity_control, x_control, y_control, theta_control, finger_control;
 
 //initializing, running
 void run()
@@ -244,8 +261,11 @@ void run()
         //get the proximity of the hand
         //not strict enough
         //need moving avg too
-        proximity_control = (int)(max_area/PROXIMITY_SCALE*100);
-        if(proximity_control > 100){proximity_control=100;}
+        proximity_control = (int)(max_area/PROXIMITY_CONTROL_SCALE*PROXIMITY_CONTROL_RANGE);
+        if(proximity_control > PROXIMITY_CONTROL_RANGE){proximity_control=PROXIMITY_CONTROL_RANGE;}
+        #if INVERT_PROXIMITY_CONTROL == true
+          proximity_control=PROXIMITY_CONTROL_RANGE - proximity_control;
+        #endif
         #if SHOW_PROXIMITY == true
           cout << "rel_maxarea: " << max_area << endl;
           cout << "perc_maxarea: " << proximity_control << endl;
@@ -355,9 +375,9 @@ void run()
           #endif
 
 					cvResetImageROI(sourceFrame);
-					CvFont font;
+					/*CvFont font;
 					cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX, 1.5, 1.5, 0, 5, CV_AA);
-					cvPutText(sourceFrame, txt, cvPoint(50, 50), &font, cvScalar(0, 0, 255, 0));
+					cvPutText(sourceFrame, txt, cvPoint(50, 50), &font, cvScalar(0, 0, 255, 0));*/
 					//
 					//drop event here! ---------------------------------------
 
