@@ -6,3 +6,4 @@
 4. add moving average for all of the control parameters
 5. add RtMIDI to generate output
 6. test with DAW
+7. make a serious documentation
