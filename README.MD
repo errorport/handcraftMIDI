@@ -10,6 +10,7 @@ ___
 
 The project uses CMake and it is still configured.
 
+
 1.
 
 ```sh
@@ -19,9 +20,15 @@ $ cd handcraftMIDI
 2.
 
 ```sh
+$ cmake .
+```
+
+3.
+
+```sh
 $ make
 ```
-3.
+4.
 ```sh
 $ ./handmarker
 ```
