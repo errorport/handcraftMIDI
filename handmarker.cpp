@@ -1,6 +1,8 @@
 #include <opencv/cv.h>
 #include <opencv/cxcore.h>
 #include <opencv/highgui.h>
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 #include <iostream>
 
 #define SUBFRAME_BIT_DEPTH   8      //bit depth of the subframe source
@@ -21,8 +23,9 @@
 #define ROI_SIZE_Y           300    //Region of Interest size: Y -- may be eq to GRAY_FRAME_HEIGHT
 
 #define BLUR_APERATURE_SIZE   20    //
+#define BIN_THRESH            0
 
-#define INVBIN                false  // for rebinarizing the binarized image
+#define INVBIN                false // for rebinarizing the binarized image
 
 #define SHOWSRCFIRST          false
 #define SHOWMAIN              true
@@ -31,6 +34,7 @@
 
 #define SHOWPOS               false //  write to >>1 the position of fingers
 #define SHOWROI               true // to show the ROI on the sourceFrame
+#define SHOW_CENTER           true
 
 using namespace     std;
 using namespace     cv;
@@ -68,6 +72,11 @@ CvPoint pt0;
 
 CvMemStorage* storage1;
 CvMemStorage* storage2;
+
+vector<Point> points;
+
+int meanX, meanY;
+int nomdef; // number of defections
 
 //initializing, running
 void run()
@@ -130,6 +139,8 @@ void run()
     contourNumber = 0;
     area=max_area = 0.0;
     ptr           = 0;
+    meanX = meanY = 0;
+    nomdef        = 0;
     //eof reinit
 
 
@@ -157,7 +168,7 @@ void run()
     cvSmooth(grayFrame, grayFrame, CV_BLUR, BLUR_APERATURE_SIZE, 0);
 
     //binarizing
-    cvThreshold(grayFrame, grayFrame, 0, 255, (CV_THRESH_BINARY_INV+CV_THRESH_OTSU));
+    cvThreshold(grayFrame, grayFrame, BIN_THRESH, 255, (CV_THRESH_BINARY_INV+CV_THRESH_OTSU));
     #if INVBIN == true
       cvThreshold(grayFrame, grayFrame, 250, 255,(CV_THRESH_BINARY_INV));
     #endif
@@ -181,6 +192,7 @@ void run()
 
     //if any contours has been found
     area = max_area = 0.0;
+
     if(contourNumber>0)
     {
       for(ptr=first_contour; ptr!=NULL; ptr=ptr->h_next)
@@ -192,6 +204,7 @@ void run()
 					maxitem=ptr;
 				}
 			}
+
       if(max_area > 1000)
 			{
 
@@ -217,11 +230,13 @@ void run()
 				{
 					CvPoint pt = **CV_GET_SEQ_ELEM( CvPoint*, hull, i );
 					cvLine( sourceFrame, pt0, pt, CV_RGB( 255, 0, 0 ), 1, CV_AA, 0 );
+          meanX+=pt0.x;
+          meanY+=pt0.y;
 					pt0 = pt;
 				}
 				for( ; defects; defects = defects->h_next)
 				{
-					int nomdef = defects->total; // defect amount
+					nomdef = defects->total; // defect amount
 					// outlet_float( m_nomdef, nomdef );
 					// printf(" defect no %d \n",nomdef);
 					if(nomdef == 0)
@@ -246,11 +261,16 @@ void run()
 							       cout << i << ": x: "<<defectArray[i].depth_point->x << "\n";
 							       cout << i << ": y: "<<defectArray[i].depth_point->y << "\n";
               #endif
+
 							cvCircle( sourceFrame, *(defectArray[i].start), 5, CV_RGB(255,255,0), 2, 8,0); // inbetween finger points
 							cvLine( sourceFrame, *(defectArray[i].depth_point), *(defectArray[i].end),CV_RGB(0,255,255),1, CV_AA, 0 );
-							cvDrawContours( sourceFrame ,defects,CV_RGB(0,0,0),CV_RGB(255,0,0),-1,CV_FILLED,8);
+							//cvDrawContours( sourceFrame ,defects,CV_RGB(0,0,0),CV_RGB(255,0,255),-1,CV_FILLED,8);
+
 						}
 					}
+
+
+
 					// cout<<con<<"\n";
 					char txt[40]="";
 					if(con==1)
@@ -268,7 +288,7 @@ void run()
 						char txt1[]="f:4";
 						strcat(txt,txt1);
 					}
-					else if(con==4)
+					else if(con>=4)
 					{
 						char txt1[]="f:5";
 						strcat(txt,txt1);
@@ -290,13 +310,15 @@ void run()
 					//drop event here! ---------------------------------------
 
           //Free memory
+          meanX/=nomdef; meanX+=ROI_COORDINATE_X;
+          meanY/=nomdef;
 					free(defectArray);
 				}
 				cvReleaseMemStorage( &storage1 );
 				cvReleaseMemStorage( &storage2 );
 			}
 
-    } //EOSEQ
+    }
 
     // ------------------------------
     cvReleaseMemStorage( &storage );
@@ -325,11 +347,17 @@ void run()
             );
     #endif
 
+    #if SHOW_CENTER == true
+      //
+      cvCircle( sourceFrame, cvPoint(meanX,meanY), 10, CV_RGB(255,255,255), 2, 8,0); //
+
+    #endif
+
     #if SHOWMAIN == true
   		cvNamedWindow( "HandMarker",1);
       cvShowImage("HandMarker",sourceFrame);
     #endif
-	}
+	}//EOSEQ
 	cvReleaseCapture( &capture);
 	cvDestroyAllWindows();
 }
