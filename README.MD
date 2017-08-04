@@ -35,3 +35,10 @@ $ ./handmarker
 
 ___ 
 
+## Requirements
+
+
+- OpenCV 3.3.0-rc
+- G++ 6.3.0
+- cmake 3.7.2
+- GNU Make 4.1
