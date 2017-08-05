@@ -33,7 +33,7 @@ $ make
 $ ./handmarker
 ```
 
-___ 
+___
 
 ## Requirements
 
@@ -42,3 +42,5 @@ ___
 - G++ 6.3.0
 - cmake 3.7.2
 - GNU Make 4.1
+- libasound 1.1.3
+- RtMidi 2.1.1 
