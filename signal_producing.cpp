@@ -1,4 +1,5 @@
 #include <iostream>
+#include "rtmidi/RtMidi.h"
 
 using namespace std;
 
@@ -27,3 +28,8 @@ int linear_signal_convert(const float data, const long offset, const long data_r
 }
 //maybe I shall make scale classes with cross-comparing methods and several incrementation parameters
 //like exponential scale or else
+
+void sendMidiNote(int note, int velocity)
+{
+
+}
