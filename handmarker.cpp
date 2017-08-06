@@ -1,10 +1,12 @@
 #include <opencv/cv.h>
 #include <opencv/cxcore.h>
 #include <opencv/highgui.h>
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"
+#include <opencv/cvwimage.h>
+//#include "opencv2/imgproc/imgproc.hpp"
 #include <iostream>
 #include <cmath>
+#include "rtmidi/RtMidi.h"
+#include "signal_producing.cpp"
 
 #define SUBFRAME_BIT_DEPTH   8      //bit depth of the subframe source
 #define SUBFRAME_CHANNELS    1      //channels of the subframe source (original:3)
@@ -17,10 +19,10 @@
 
 #define GRAY_FRAME_SIZE_FROM_ROI  true //in this case the grayFrame's size will be inherited from ROI
 
-#define ROI_COORDINATE_X     340    //Region of Interest coordinate: X
+#define ROI_COORDINATE_X     240    //Region of Interest coordinate: X
 #define ROI_COORDINATE_Y     10    //Region of Interest coordinate: Y
 
-#define ROI_SIZE_X           270    //Region of Interest size: X -- may be eq to GRAY_FRAME_WIDTH
+#define ROI_SIZE_X           370    //Region of Interest size: X -- may be eq to GRAY_FRAME_WIDTH
 #define ROI_SIZE_Y           300    //Region of Interest size: Y -- may be eq to GRAY_FRAME_HEIGHT
 
 #define BLUR_APERATURE_SIZE   20    //
@@ -48,18 +50,23 @@
 #define PROXIMITY_CONTROL_SCALE       42000.0 // for normalize the proximity control value - it have to be the maximum
 #define PROXIMITY_CONTROL_RANGE       127 // for normalize the proximity control value - it have to be the maximum
 #define INVERT_PROXIMITY_CONTROL      false
+#define PROXIMITY_STACK_SIZE          10
 
-#define X_CONTROL_OFFSET      0       // have to be finalized
-#define X_CONTROL_RANGE       127
-#define INVERT_X_CONTROL      false
+#define X_CONTROL_OFFSET              -20       // have to be finalized
+#define X_CONTROL_RANGE               127
+#define INVERT_X_CONTROL              false
+#define X_CONTROL_STACK_SIZE          10
 
-#define Y_CONTROL_OFFSET      0       // have to be finalized
-#define Y_CONTROL_RANGE       127
-#define INVERT_Y_CONTROL      false
+#define Y_CONTROL_OFFSET              -30      // have to be finalized
+#define Y_CONTROL_RANGE               127
+#define INVERT_Y_CONTROL              false
+#define Y_CONTROL_STACK_SIZE          10
 
-#define THETA_CONTROL_OFFSET  0       // have to be finalized
-#define THETA_CONTROL_RANGE   127
-#define INVERT_THETA CONTROL  false
+#define THETA_CONTROL_OFFSET          35         // have to be finalized
+#define THETA_CONTROL_SCALE           60
+#define THETA_CONTROL_RANGE           127
+#define INVERT_THETA_CONTROL          false
+#define THETA_CONTROL_STACK_SIZE      10
 
 using namespace     std;
 using namespace     cv;
@@ -89,7 +96,6 @@ int                 contourNumber;
 double              area;
 double              max_area;
 
-
 //
 CvSeq* ptr;
 
@@ -105,7 +111,17 @@ int meanX, meanY;
 int nomdef; // number of defections
 int delta_x, delta_y, theta;
 
+//controls
 int proximity_control, x_control, y_control, theta_control, finger_control;
+//it will be useful for calculating moving average
+//vector<int> proximity_control_stack, x_control_stack, y_control_stack, theta_control_stack; //finger control does not need moving average stack. obv.
+//int proximity_MA, x_control_MA, y_control_MA, theta_control_MA;
+
+
+
+RtMidiOut *midiout;
+vector<unsigned char> MIDImessage;
+unsigned int nPorts;
 
 //initializing, running
 void run()
@@ -156,7 +172,23 @@ void run()
           << "height: " << GRAY_FRAME_HEIGHT << "px" << endl;
   #endif
 
+  // Check available ports.
+  unsigned int nPorts = midiout->getPortCount();
+  if ( nPorts == 0 ) {
+    cout << "No ports available! Check the ports' usage!\nHALTED!\n";
+    exit( EXIT_FAILURE );
+  }
 
+  // Open first available port.
+  try {
+    midiout->openPort( 0 );
+  }
+  catch ( RtMidiError &error ) {
+    error.printMessage();
+    cout << "Failed to open the available MIDI port! Check the ports' usage!\nHALTED!\n";
+    exit( EXIT_FAILURE );
+  }
+  //EOfMIDI section ------------------------------------------------------------
 
   //main cycle
   while(cvWaitKey(100)!=27)
@@ -258,19 +290,6 @@ void run()
 
 				hull = cvConvexHull2( ptseq, 0, CV_CLOCKWISE, 0 );
 
-        //get the proximity of the hand
-        //not strict enough
-        //need moving avg too
-        proximity_control = (int)(max_area/PROXIMITY_CONTROL_SCALE*PROXIMITY_CONTROL_RANGE);
-        if(proximity_control > PROXIMITY_CONTROL_RANGE){proximity_control=PROXIMITY_CONTROL_RANGE;}
-        #if INVERT_PROXIMITY_CONTROL == true
-          proximity_control=PROXIMITY_CONTROL_RANGE - proximity_control;
-        #endif
-        #if SHOW_PROXIMITY == true
-          cout << "rel_maxarea: " << max_area << endl;
-          cout << "perc_maxarea: " << proximity_control << endl;
-        #endif
-
 				int hullcount = hull->total;
 				defects= cvConvexityDefects(ptseq,hull,storage2  );
 				CvConvexityDefect* defectArray;
@@ -326,22 +345,6 @@ void run()
 						}
 					}
 
-            //got the center
-            //not strict enough
-            //moving avg needed for smooth movement of this point
-            meanX/=nomdef; meanX+=ROI_COORDINATE_X;
-            meanY/=nomdef;
-
-            #if SHOW_CENTER == true
-            cout << "Center: x==" << meanX << " y==" << meanY << endl;
-            #endif
-
-            //calculating the direction
-            theta = theta/nomdef;
-
-            #if SHOW_THETA == true
-            cout << "Direction angle: " << theta << "°" << endl;
-            #endif
 
 					// cout<<con<<"\n";
 					char txt[40]="";
@@ -418,24 +421,175 @@ void run()
             );
     #endif
 
-    #if SHOW_CENTER == true
-      //
-      cvCircle( sourceFrame, cvPoint(meanX,meanY), 10, CV_RGB(255,255,255), 2, 8,0); //
 
+
+    //making the control signals -----------------------------------------------
+
+    // ~ int proximity_control, x_control, y_control, theta_control, finger_control;
+    /*
+    Control signal normaliing method:
+    1., set the interval
+    2., set the offset
+    3., set the moving average
+    4., set the MIDI signal
+    5., send the events
+    */
+    /*
+
+    */
+
+    //get the proximity of the hand --------------------------------------------
+    //not strict enough
+    //need moving avg too
+    /*proximity_control = (int)(max_area/PROXIMITY_CONTROL_SCALE*PROXIMITY_CONTROL_RANGE);
+    if(proximity_control > PROXIMITY_CONTROL_RANGE){proximity_control=PROXIMITY_CONTROL_RANGE;}
+    #if INVERT_PROXIMITY_CONTROL == true
+      proximity_control=PROXIMITY_CONTROL_RANGE - proximity_control;
+    #endif*/
+
+
+
+
+
+    proximity_control = linear_signal_convert((int)max_area,
+                                              0,
+                                              PROXIMITY_CONTROL_SCALE,
+                                              PROXIMITY_CONTROL_RANGE,
+                                              INVERT_PROXIMITY_CONTROL
+                                            );
+    #if SHOW_PROXIMITY == true
+      cout << "rel_maxarea: " << max_area << endl;
+      cout << "proximity_control: " << proximity_control  << endl;
+
+
+
+      //cout << "test_prox:" << linear_signal_convert((int)max_area, 0, PROXIMITY_CONTROL_SCALE, PROXIMITY_CONTROL_RANGE, true) << endl;
     #endif
 
+
+
+
+    //got the center -----------------------------------------------------------
+    //not strict enough
+    //moving avg needed for smooth movement of this point
+ /*
+    vector<Point2f> centerP;
+    minEnclosingCircle(*first_contour, &centerP, 10);
+*/
+
+    if(nomdef>0){
+      meanX/=nomdef; meanX+=ROI_COORDINATE_X;
+      meanY/=nomdef; meanY+=ROI_COORDINATE_Y;
+    }
+    else
+    {
+      meanX=meanY =0;
+    }
+
+
+
+    //normalizing by interval
+    /*x_control = (meanX - ROI_COORDINATE_X)/ROI_SIZE_X*X_CONTROL_RANGE;
+    if(x_control > X_CONTROL_RANGE) {x_control= X_CONTROL_RANGE;}*/
+
+
+
+    if(meanX>ROI_COORDINATE_X and meanY>ROI_COORDINATE_Y)
+    {
+    x_control = linear_signal_convert(meanX,
+                                      - ROI_COORDINATE_X,
+                                      ROI_SIZE_X + X_CONTROL_OFFSET,
+                                      X_CONTROL_RANGE,
+                                      INVERT_X_CONTROL
+                                     );
+    y_control = linear_signal_convert(meanY,
+                                      - ROI_COORDINATE_Y,
+                                      ROI_SIZE_Y + Y_CONTROL_OFFSET,
+                                      Y_CONTROL_RANGE,
+                                      INVERT_Y_CONTROL
+                                     );
+    }
+
+
+
+    #if SHOW_CENTER == true
+    cout << "Center: x==" << meanX << " y==" << meanY << endl;
+    cout << "x_control: " << x_control << " y_control: " << y_control << endl;
+    cvCircle( sourceFrame, cvPoint(meanX, meanY), 10, CV_RGB(255,255,255), 2, 8,0);
+    #endif
+
+    //calculating the direction ------------------------------------------------
+    if(nomdef>0){
+    theta = theta/nomdef;
+
+    theta_control = linear_signal_convert(theta,
+                                          THETA_CONTROL_OFFSET,
+                                          THETA_CONTROL_SCALE,
+                                          THETA_CONTROL_RANGE,
+                                          INVERT_THETA_CONTROL
+                                        );
+    }
+    else
+    {
+      theta_control=0;
+    }
+
+
+
+    #if SHOW_THETA == true
+    cout << "Direction angle: " << theta << "°" << endl;
+    cout << "Theta control: "   << theta_control << endl;
+    #endif
+
+    //number of fingers --------------------------------------------------------
+    #if SHOW_FINGERS == true
+    cout << "Number of found fingers: " << con << endl;
+    #endif
+
+    //making the MIDI signal ---------------------------------------------------
+
+
+
+
+    //show the main frame
     #if SHOWMAIN == true
-  		cvNamedWindow( "HandMarker",1);
+      cvNamedWindow( "HandMarker",1);
       cvShowImage("HandMarker",sourceFrame);
     #endif
+
+
 	}//EOSEQ
 	cvReleaseCapture( &capture);
 	cvDestroyAllWindows();
 }
 
+void MIDIinit()
+{
+  //MIDI init section ----------------------------------------------------------
+  // RtMidiOut constructor
+  try {
+    midiout = new RtMidiOut();
+  }
+  catch ( RtMidiError &error ) {
+    error.printMessage();
+    exit( EXIT_FAILURE );
+  }
+  nPorts = midiout->getPortCount();
+  if ( nPorts == 0 ) {
+    cout << "No ports available!\n";
+    //goto cleanup;
+  }
+  cout << "There are " << nPorts << " ports are available: " << midiout->getPortName() << endl;
+  // Open first available port.
+  midiout->openPort( 0 );
+}
+
 int main()
 {
-  //init();
+  MIDIinit();
+
+
+
   run();
   return 0;
 }
