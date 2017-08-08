@@ -7,7 +7,7 @@
 3. ~~check the proximity of the hand~~
 4. ~~finalize the control parameters for output~~
 5. ~~add RtMIDI to generate output~~
-6. add moving average for all of the control parameters
+6. ~~add moving average for all of the control parameters~~
 7. make MIDI events
 8. test with DAW
 
