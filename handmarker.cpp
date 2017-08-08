@@ -4,6 +4,7 @@
 #include <opencv/cvwimage.h>
 //#include "opencv2/imgproc/imgproc.hpp"
 #include <iostream>
+#include <queue>
 #include <cmath>
 #include "rtmidi/RtMidi.h"
 #include "signal_producing.cpp"
@@ -53,13 +54,15 @@
 #define PROXIMITY_STACK_SIZE          10
 
 #define X_CONTROL_OFFSET              -20      //inductive
-#define X_CONTROL_RANGE               127
+#define X_CONTROL_RANGE               7
 #define INVERT_X_CONTROL              false
+#define X_CONTROL_INCREMENT           7
 #define X_CONTROL_STACK_SIZE          10
 
 #define Y_CONTROL_OFFSET              -30      //  inductive
-#define Y_CONTROL_RANGE               127
+#define Y_CONTROL_RANGE               7
 #define INVERT_Y_CONTROL              false
+#define Y_CONTROL_INCREMENT           7
 #define Y_CONTROL_STACK_SIZE          10
 
 #define THETA_CONTROL_OFFSET          35         // inductive
@@ -67,6 +70,10 @@
 #define THETA_CONTROL_RANGE           127
 #define INVERT_THETA_CONTROL          false
 #define THETA_CONTROL_STACK_SIZE      10
+
+#define FIRST_NOTE                    21       //
+
+
 
 using namespace     std;
 using namespace     cv;
@@ -114,14 +121,24 @@ int delta_x, delta_y, theta;
 //controls
 int proximity_control, x_control, y_control, theta_control, finger_control;
 //it will be useful for calculating moving average
-//vector<int> proximity_control_stack, x_control_stack, y_control_stack, theta_control_stack; //finger control does not need moving average stack. obv.
-//int proximity_MA, x_control_MA, y_control_MA, theta_control_MA;
 
+//these vars will contain the actual MA values (after a test it will be dropped)
+int proximity_MA, x_control_MA, y_control_MA, theta_control_MA;
+
+//these vars are for moving average FIFO stacks
+deque<int> x_control_stack, y_control_stack, proximity_control_stack, theta_control_stack;
+
+//these vars for moving average stack filling untill they got real value
+//not yet actual
+//have to be initialized!
+//int x_control_MA_index, y_control_MA_index, proximity_control_MA_index, theta_control_MA_index;
 
 
 RtMidiOut *midiout;
 //vector<unsigned char> MIDImessage;
 unsigned int nPorts;
+
+int actual_note_X, actual_note_Y;
 
 //initializing, running
 void run()
@@ -129,6 +146,16 @@ void run()
   //INIT SEQUENCE
             cout << "\n";
             cout << "Initializing..." << endl;
+
+            //init control stacks for moving average
+            init_stack(x_control_stack, X_CONTROL_STACK_SIZE);
+            init_stack(y_control_stack, Y_CONTROL_STACK_SIZE);
+            init_stack(proximity_control_stack, PROXIMITY_STACK_SIZE);
+            init_stack(theta_control_stack, THETA_CONTROL_STACK_SIZE);
+
+            actual_note_X = actual_note_Y = 0;
+
+
             capture = cvCaptureFromCAM(0);
             //
             /*
@@ -173,6 +200,7 @@ void run()
   #endif
 
   // Check available ports.
+  midiout = new RtMidiOut();
   unsigned int nPorts = midiout->getPortCount();
   if ( nPorts == 0 ) {
     cout << "No ports available! Check the ports' usage!\nHALTED!\n";
@@ -457,14 +485,7 @@ void run()
                                               PROXIMITY_CONTROL_RANGE,
                                               INVERT_PROXIMITY_CONTROL
                                             );
-    #if SHOW_PROXIMITY == true
-      cout << "rel_maxarea: " << max_area << endl;
-      cout << "proximity_control: " << proximity_control  << endl;
 
-
-
-      //cout << "test_prox:" << linear_signal_convert((int)max_area, 0, PROXIMITY_CONTROL_SCALE, PROXIMITY_CONTROL_RANGE, true) << endl;
-    #endif
 
 
 
@@ -500,23 +521,21 @@ void run()
                                       - ROI_COORDINATE_X,
                                       ROI_SIZE_X + X_CONTROL_OFFSET,
                                       X_CONTROL_RANGE,
-                                      INVERT_X_CONTROL
+                                      INVERT_X_CONTROL,
+                                      X_CONTROL_INCREMENT
                                      );
     y_control = linear_signal_convert(meanY,
                                       - ROI_COORDINATE_Y,
                                       ROI_SIZE_Y + Y_CONTROL_OFFSET,
                                       Y_CONTROL_RANGE,
-                                      INVERT_Y_CONTROL
+                                      INVERT_Y_CONTROL,
+                                      Y_CONTROL_INCREMENT
                                      );
     }
 
 
 
-    #if SHOW_CENTER == true
-    cout << "Center: x==" << meanX << " y==" << meanY << endl;
-    cout << "x_control: " << x_control << " y_control: " << y_control << endl;
-    cvCircle( sourceFrame, cvPoint(meanX, meanY), 10, CV_RGB(255,255,255), 2, 8,0);
-    #endif
+
 
     //calculating the direction ------------------------------------------------
     if(nomdef>0){
@@ -534,11 +553,32 @@ void run()
       theta_control=0;
     }
 
+    //geting moving average for control vars
 
+    x_control_MA        = moving_average(x_control_stack, x_control);
+    y_control_MA        = moving_average(y_control_stack, y_control);
+    proximity_MA        = moving_average(proximity_control_stack, proximity_control);
+    theta_control_MA    = moving_average(theta_control_stack, theta_control);
+
+    //showing control and MA data
+
+    #if SHOW_CENTER == true
+    cout << "Center: x==" << meanX << " y==" << meanY << endl;
+    cout << "x_control: " << x_control << " y_control: " << y_control << endl;
+    cout << "x_control_MA, y_control_MA : (" << x_control_MA << ", " << y_control_MA << ")" << endl;
+    cvCircle( sourceFrame, cvPoint(x_control_MA, y_control_MA), 10, CV_RGB(255,255,255), 2, 8,0);
+    #endif
 
     #if SHOW_THETA == true
     cout << "Direction angle: " << theta << "°" << endl;
     cout << "Theta control: "   << theta_control << endl;
+    cout << "theta_control_MA: (" << theta_control_MA << ")" << endl;
+    #endif
+
+    #if SHOW_PROXIMITY == true
+      cout << "rel_maxarea: " << max_area << endl;
+      cout << "proximity_control: " << proximity_control  << endl;
+      cout << "proximity_MA: (" << proximity_MA << ")" << endl;
     #endif
 
     //number of fingers --------------------------------------------------------
@@ -548,6 +588,17 @@ void run()
 
     //making the MIDI signal ---------------------------------------------------
 
+      //velocity <- proximity_MA
+      //note1 <- x_control_MA
+      //note2 <- y_control_MA
+      //sustain
+
+      terminateMidiNote(actual_note_X, proximity_MA, *midiout);
+      terminateMidiNote(actual_note_Y, proximity_MA, *midiout);
+      actual_note_X = x_control_MA;
+      actual_note_Y = y_control_MA;
+      MidiNote(actual_note_X, proximity_MA, *midiout);
+      MidiNote(actual_note_Y, proximity_MA, *midiout);
 
 
 

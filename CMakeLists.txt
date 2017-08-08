@@ -36,9 +36,13 @@ include_directories(".")
 
 add_executable(handmarker handmarker.cpp)
 add_executable(MidiPortTest MidiPortTest.cpp)
+add_executable(MidiOutTest MidiOutTest.cpp)
+add_executable(MidiInTest MidiInTest.cpp)
 add_library(signal_producing signal_producing.cpp)
 
 target_link_libraries(handmarker ${OpenCV_LIBS})
 target_link_libraries(handmarker "rtmidi")
 target_link_libraries(MidiPortTest "rtmidi")
+target_link_libraries(MidiOutTest "rtmidi")
+target_link_libraries(MidiInTest "rtmidi")
 target_link_libraries(signal_producing "rtmidi")

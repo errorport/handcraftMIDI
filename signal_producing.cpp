@@ -1,9 +1,10 @@
 #include <iostream>
+#include <queue>
+#include <unistd.h>
 #include "rtmidi/RtMidi.h"
 
 using namespace std;
 
-vector<unsigned char> MIDImessage;
 
 
 //converting a signal flow to another
@@ -17,8 +18,9 @@ this is a linear one. i think it's ok for this time.
 - data_range : the original range
 - range : the new interval's range
 - invert : obvi. maybe one interval's data type have to be inverted in incrementation
+- increment : incrementation between scale values
 */
-int linear_signal_convert(const float data, const long offset, const long data_range, const long range, bool invert=false)
+int linear_signal_convert(const float data, const long offset, const long data_range, const long range, bool invert=false, int increment=1)
 {
   int result=0;
     result = (int)((float)(data + offset)/(float)data_range*range);
@@ -27,6 +29,7 @@ int linear_signal_convert(const float data, const long offset, const long data_r
     if(result > range) {result = range;}
     if(invert==true){result=range-result;}
     if(result<0){result=0;}
+    result *= increment;
     return result;
 }
 //maybe I shall make scale classes with cross-comparing methods and several incrementation parameters
@@ -34,22 +37,50 @@ int linear_signal_convert(const float data, const long offset, const long data_r
 
 //------------------------------------------------------------------------------
 
+//moving average
+
+int moving_average(deque<int>& stack, int dataIn)
+{
+  int sum=0;
+  stack.pop_front();
+  stack.push_back(dataIn);
+  for (int i = 0; i<stack.size();i++)
+  {
+    sum+=stack.at(i);
+  }
+  return sum/stack.size();
+}
+
+void init_stack(deque<int>& stack, int size)
+{
+  for (int i = 0; i<size;i++)
+  {
+    stack.push_back(0);
+  }
+}
+
+//------------------------------------------------------------------------------
+
 //MIDI signal session
 
 //making midi NoteOn message
 
-void sendMidiNote(int note, int velocity, RtMidiOut& midiout)
+void MidiNote(unsigned char note, unsigned char velocity, RtMidiOut& midiout)
 {
-  MIDImessage[0] = 144; //NoteOn command
-  MIDImessage[1] = note;
-  MIDImessage[2] = velocity;
+  vector<unsigned char> MIDImessage;
+  MIDImessage.push_back(144); //NoteOn command
+  MIDImessage.push_back(note);
+  MIDImessage.push_back(velocity);
   midiout.sendMessage( &MIDImessage );
+  usleep(50);
 }
 
-void terminateMidiNote(int note, int velocity, RtMidiOut& midiout)
+void terminateMidiNote(unsigned char note, unsigned char velocity, RtMidiOut& midiout)
 {
-  MIDImessage[0] = 128; //NoteOff command
-  MIDImessage[1] = note;
-  MIDImessage[2] = velocity;
+  vector<unsigned char> MIDImessage;
+  MIDImessage.push_back(128); //NoteOff command
+  MIDImessage.push_back(note);
+  MIDImessage.push_back(velocity);
   midiout.sendMessage( &MIDImessage );
+  usleep(50);
 }

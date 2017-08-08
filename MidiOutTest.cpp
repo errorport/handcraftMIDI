@@ -1,7 +1,7 @@
 // midiout.cpp
 #include <iostream>
 #include <cstdlib>
-#include "rtmidi/RtMidi.h"
+#include "RtMidi.h"
 int main()
 {
   RtMidiOut *midiout = new RtMidiOut();
@@ -12,12 +12,8 @@ int main()
     std::cout << "No ports available!\n";
     goto cleanup;
   }
-  std::cout << "There are " << nPorts << " ports are available: " << midiout->getPortName() << std::endl;
   // Open first available port.
-  for(int j = 0; j<nPorts;j++){
-    std::cout << "Port(" << j << ") : " << midiout->getPortName(j) << std::endl;
-  }
-  midiout->openPort( 3 );
+  midiout->openPort( 0 );
   // Send out a series of MIDI messages.
   // Program change: 192, 5
   message.push_back( 192 );
@@ -33,7 +29,7 @@ int main()
   message[1] = 64;
   message[2] = 90;
   midiout->sendMessage( &message );
-  //SLEEP( 500 ); // Platform-dependent ... see example in tests directory.
+
   // Note Off: 128, 64, 40
   message[0] = 128;
   message[1] = 64;
