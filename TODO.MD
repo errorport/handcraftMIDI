@@ -8,8 +8,9 @@
 4. ~~finalize the control parameters for output~~
 5. ~~add RtMIDI to generate output~~
 6. ~~add moving average for all of the control parameters~~
-7. make MIDI events
-8. test with DAW
+7. ~~make MIDI events~~
+8. ~~test with DAW~~
+9. finalize the control axis to a demonstration
 
 # Second cycle
 
