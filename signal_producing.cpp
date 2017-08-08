@@ -3,6 +3,9 @@
 
 using namespace std;
 
+vector<unsigned char> MIDImessage;
+
+
 //converting a signal flow to another
 //by offset, intervall, etc
 
@@ -29,7 +32,24 @@ int linear_signal_convert(const float data, const long offset, const long data_r
 //maybe I shall make scale classes with cross-comparing methods and several incrementation parameters
 //like exponential scale or else
 
-void sendMidiNote(int note, int velocity)
-{
+//------------------------------------------------------------------------------
 
+//MIDI signal session
+
+//making midi NoteOn message
+
+void sendMidiNote(int note, int velocity, RtMidiOut& midiout)
+{
+  MIDImessage[0] = 144; //NoteOn command
+  MIDImessage[1] = note;
+  MIDImessage[2] = velocity;
+  midiout.sendMessage( &MIDImessage );
+}
+
+void terminateMidiNote(int note, int velocity, RtMidiOut& midiout)
+{
+  MIDImessage[0] = 128; //NoteOff command
+  MIDImessage[1] = note;
+  MIDImessage[2] = velocity;
+  midiout.sendMessage( &MIDImessage );
 }

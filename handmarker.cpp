@@ -52,17 +52,17 @@
 #define INVERT_PROXIMITY_CONTROL      false
 #define PROXIMITY_STACK_SIZE          10
 
-#define X_CONTROL_OFFSET              -20       // have to be finalized
+#define X_CONTROL_OFFSET              -20      //inductive
 #define X_CONTROL_RANGE               127
 #define INVERT_X_CONTROL              false
 #define X_CONTROL_STACK_SIZE          10
 
-#define Y_CONTROL_OFFSET              -30      // have to be finalized
+#define Y_CONTROL_OFFSET              -30      //  inductive
 #define Y_CONTROL_RANGE               127
 #define INVERT_Y_CONTROL              false
 #define Y_CONTROL_STACK_SIZE          10
 
-#define THETA_CONTROL_OFFSET          35         // have to be finalized
+#define THETA_CONTROL_OFFSET          35         // inductive
 #define THETA_CONTROL_SCALE           60
 #define THETA_CONTROL_RANGE           127
 #define INVERT_THETA_CONTROL          false
@@ -120,7 +120,7 @@ int proximity_control, x_control, y_control, theta_control, finger_control;
 
 
 RtMidiOut *midiout;
-vector<unsigned char> MIDImessage;
+//vector<unsigned char> MIDImessage;
 unsigned int nPorts;
 
 //initializing, running
@@ -587,9 +587,6 @@ void MIDIinit()
 int main()
 {
   MIDIinit();
-
-
-
   run();
   return 0;
 }
