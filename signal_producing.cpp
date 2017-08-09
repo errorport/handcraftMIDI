@@ -72,7 +72,7 @@ void MidiNote(unsigned char note, unsigned char velocity, RtMidiOut& midiout)
   MIDImessage.push_back(note);
   MIDImessage.push_back(velocity);
   midiout.sendMessage( &MIDImessage );
-  usleep(50);
+  //usleep(50);
 }
 
 void terminateMidiNote(unsigned char note, unsigned char velocity, RtMidiOut& midiout)
@@ -82,5 +82,15 @@ void terminateMidiNote(unsigned char note, unsigned char velocity, RtMidiOut& mi
   MIDImessage.push_back(note);
   MIDImessage.push_back(velocity);
   midiout.sendMessage( &MIDImessage );
-  usleep(50);
+  //usleep(50);
+}
+
+void MidiCC(unsigned char cc, unsigned char value, RtMidiOut& midiout)
+{
+  vector<unsigned char> MIDImessage;
+  MIDImessage.push_back(176); //CC command
+  MIDImessage.push_back(cc);
+  MIDImessage.push_back(value);
+  midiout.sendMessage( &MIDImessage );
+  //usleep(50);
 }

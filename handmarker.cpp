@@ -29,7 +29,7 @@
 #define BLUR_APERATURE_SIZE   20    //
 #define BIN_THRESH            0
 
-#define INVBIN                true // for rebinarizing the binarized image
+#define INVBIN                false // for rebinarizing the binarized image
 
 #define SHOWSRCFIRST          false
 #define SHOWMAIN              true
@@ -55,23 +55,25 @@
 
 #define X_CONTROL_OFFSET              -20      //inductive
 #define X_CONTROL_RANGE               7
-#define INVERT_X_CONTROL              false
+#define INVERT_X_CONTROL              true
 #define X_CONTROL_INCREMENT           7
-#define X_CONTROL_STACK_SIZE          10
+#define X_CONTROL_STACK_SIZE          20
 
 #define Y_CONTROL_OFFSET              -30      //  inductive
 #define Y_CONTROL_RANGE               7
-#define INVERT_Y_CONTROL              false
+#define INVERT_Y_CONTROL              true
 #define Y_CONTROL_INCREMENT           7
-#define Y_CONTROL_STACK_SIZE          10
+#define Y_CONTROL_STACK_SIZE          20
 
 #define THETA_CONTROL_OFFSET          35         // inductive
 #define THETA_CONTROL_SCALE           60
 #define THETA_CONTROL_RANGE           127
 #define INVERT_THETA_CONTROL          false
 #define THETA_CONTROL_STACK_SIZE      10
+#define THETA_CONTROL_CC              5         //it is a MIDI CC address
 
 #define FIRST_NOTE                    21       //
+#define MIN_VELO                      70        //minimum velocity to send
 
 
 
@@ -102,6 +104,11 @@ int                 contourNumber;
 //area of the hand
 double              area;
 double              max_area;
+
+//threshold for binarization
+int                 threshold;
+
+char trackbar_text[50];
 
 //
 CvSeq* ptr;
@@ -218,6 +225,8 @@ void run()
   }
   //EOfMIDI section ------------------------------------------------------------
 
+  threshold = BIN_THRESH;
+
   //main cycle
   while(cvWaitKey(100)!=27)
   {
@@ -261,7 +270,8 @@ void run()
     cvSmooth(grayFrame, grayFrame, CV_BLUR, BLUR_APERATURE_SIZE, 0);
 
     //binarizing
-    cvThreshold(grayFrame, grayFrame, BIN_THRESH, 255, (CV_THRESH_BINARY_INV+CV_THRESH_OTSU));
+    cvThreshold(grayFrame, grayFrame, threshold, 255, (CV_THRESH_BINARY_INV+CV_THRESH_OTSU));
+          cout << "Threshold: " << threshold << endl;
     #if INVBIN == true
       cvThreshold(grayFrame, grayFrame, 250, 255,(CV_THRESH_BINARY_INV));
     #endif
@@ -592,19 +602,25 @@ void run()
       //note1 <- x_control_MA
       //note2 <- y_control_MA
       //sustain
-
       terminateMidiNote(actual_note_X, proximity_MA, *midiout);
       terminateMidiNote(actual_note_Y, proximity_MA, *midiout);
       actual_note_X = x_control_MA;
       actual_note_Y = y_control_MA;
-      MidiNote(actual_note_X, proximity_MA, *midiout);
-      MidiNote(actual_note_Y, proximity_MA, *midiout);
+      if(proximity_MA>=MIN_VELO){
+        MidiNote(actual_note_X, proximity_MA, *midiout);
+        MidiNote(actual_note_Y, proximity_MA, *midiout);
+      }
+      MidiCC(THETA_CONTROL_CC, theta_control, *midiout);
+
 
 
 
     //show the main frame
     #if SHOWMAIN == true
       cvNamedWindow( "HandMarker",1);
+      //add threshold trackbar
+      cvCreateTrackbar( trackbar_text, "HandMarker", &threshold, 255, NULL);
+//      cout << "Threshold: " << threshold << endl;
       cvShowImage("HandMarker",sourceFrame);
     #endif
 
