@@ -62,7 +62,7 @@
 #define Y_CONTROL_OFFSET              -30      //  inductive
 #define Y_CONTROL_RANGE               7
 #define INVERT_Y_CONTROL              true
-#define Y_CONTROL_INCREMENT           7
+#define Y_CONTROL_INCREMENT           14
 #define Y_CONTROL_STACK_SIZE          20
 
 #define THETA_CONTROL_OFFSET          35         // inductive
@@ -72,8 +72,12 @@
 #define THETA_CONTROL_STACK_SIZE      10
 #define THETA_CONTROL_CC              5         //it is a MIDI CC address
 
+#define FINGER_CONTROL_CC             6
+
 #define FIRST_NOTE                    21       //
 #define MIN_VELO                      70        //minimum velocity to send
+#define X_PITCH_OFFSET                24
+#define Y_PITCH_OFFSET                12
 
 
 
@@ -109,6 +113,8 @@ double              max_area;
 int                 threshold;
 
 char trackbar_text[50];
+
+CvScalar ROIcolor;
 
 //
 CvSeq* ptr;
@@ -382,7 +388,7 @@ void run()
 
 						}
 					}
-
+          finger_control = con;
 
 					// cout<<con<<"\n";
 					char txt[40]="";
@@ -436,26 +442,31 @@ void run()
     cvReleaseMemStorage( &storage );
 
     //drawing the ROI edges onto the main frame
+    #if INVBIN == false
+    ROIcolor = CV_RGB(0,0,0);
+    #else
+    ROIcolor = CV_RGB(255,255,255);
+    #endif
     #if SHOWROI == true
       cvLine(sourceFrame,
              cvPoint(ROI_COORDINATE_X, ROI_COORDINATE_Y),
              cvPoint(ROI_COORDINATE_X, ROI_COORDINATE_Y+ROI_SIZE_Y),
-             CV_RGB(255,255,255),1 , CV_AA, 0
+             ROIcolor,1 , CV_AA, 0
             );
       cvLine(sourceFrame,
              cvPoint(ROI_COORDINATE_X, ROI_COORDINATE_Y+ROI_SIZE_Y),
              cvPoint(ROI_COORDINATE_X+ROI_SIZE_X, ROI_COORDINATE_Y+ROI_SIZE_Y),
-             CV_RGB(255,255,255),1 , CV_AA, 0
+             ROIcolor,1 , CV_AA, 0
             );
       cvLine(sourceFrame,
              cvPoint(ROI_COORDINATE_X+ROI_SIZE_X, ROI_COORDINATE_Y+ROI_SIZE_Y),
              cvPoint(ROI_COORDINATE_X+ROI_SIZE_X, ROI_COORDINATE_Y),
-             CV_RGB(255,255,255),1 , CV_AA, 0
+             ROIcolor,1 , CV_AA, 0
             );
       cvLine(sourceFrame,
              cvPoint(ROI_COORDINATE_X+ROI_SIZE_X, ROI_COORDINATE_Y),
              cvPoint(ROI_COORDINATE_X, ROI_COORDINATE_Y),
-             CV_RGB(255,255,255),1 , CV_AA, 0
+             ROIcolor,1 , CV_AA, 0
             );
     #endif
 
@@ -565,8 +576,8 @@ void run()
 
     //geting moving average for control vars
 
-    x_control_MA        = moving_average(x_control_stack, x_control);
-    y_control_MA        = moving_average(y_control_stack, y_control);
+    x_control_MA      =x_control;  //= moving_average(x_control_stack, x_control);
+    y_control_MA      =y_control;  //= moving_average(y_control_stack, y_control);
     proximity_MA        = moving_average(proximity_control_stack, proximity_control);
     theta_control_MA    = moving_average(theta_control_stack, theta_control);
 
@@ -602,15 +613,26 @@ void run()
       //note1 <- x_control_MA
       //note2 <- y_control_MA
       //sustain
+
+
       terminateMidiNote(actual_note_X, proximity_MA, *midiout);
       terminateMidiNote(actual_note_Y, proximity_MA, *midiout);
-      actual_note_X = x_control_MA;
-      actual_note_Y = y_control_MA;
+      actual_note_X = x_control_MA+X_PITCH_OFFSET;
+      actual_note_Y = y_control_MA+Y_PITCH_OFFSET;
       if(proximity_MA>=MIN_VELO){
         MidiNote(actual_note_X, proximity_MA, *midiout);
         MidiNote(actual_note_Y, proximity_MA, *midiout);
       }
       MidiCC(THETA_CONTROL_CC, theta_control, *midiout);
+      MidiCC(FINGER_CONTROL_CC, linear_signal_convert(
+                                  finger_control,
+                                  0,
+                                  5,
+                                  127
+                                ),
+            *midiout
+            );
+
 
 
 
